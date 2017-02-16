@@ -92,9 +92,9 @@ func main() {
 
 	// if left, change delay to be on the right
 	if side == "left" {
-		e.Options("00", "0.08")
+		e.Options("00", "0.02")
 	} else if side == "right" {
-		e.Options("0.08", "00")
+		e.Options("0.02", "00")
 	}
 
 	// How long to wait before playing the left sound, and right sound, respectively.
