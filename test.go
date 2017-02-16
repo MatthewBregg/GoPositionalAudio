@@ -5,10 +5,17 @@ package main
 import "github.com/krig/go-sox"
 import "log"
 import "flag"
+import "strconv"
 
 // Reads an input file, applies volume and flanger effects,
 // plays to output device.
 func main() {
+
+	// ARGS FORMAT:
+	// [0]: Sound file
+	// [1]: Side string
+	// [2]: Intensity for the side
+
 	flag.Parse()
 
 	// All libSoX applications must start by initializing the SoX library
@@ -40,6 +47,21 @@ func main() {
 	// Close the output device before exiting
 	defer out.Release()
 
+	// grab the side and intensity
+
+	side:= flag.Arg(1)
+	intensity:= flag.Arg(2)
+
+	intensityVal, err:= strconv.ParseFloat(intensity, 64)
+
+	if err != nil {
+		log.Fatal("Some math went wrong on parsing intensity!")
+	}
+
+	if intensityVal <= 2.01 {
+		log.Fatal("Volume must be above 2! I suggest trying 3")
+	}
+
 	// Create an effects chain: Some effects need to know about the
 	// input or output encoding so we provide that information here.
 	chain := sox.CreateEffectsChain(in.Encoding(), out.Encoding())
@@ -67,7 +89,14 @@ func main() {
 	// THESE ARE THE TWO EFFECTS WE NEED, I DON"T KNOW WHY THE OTHERS ARE HERE, should try removing them.
 	// Create the delay effect, and add it
 	e = sox.CreateEffect(sox.FindEffect("delay"))
-	e.Options("00", "0.08")
+
+	// if left, change delay to be on the right
+	if side == "left" {
+		e.Options("00", "0.08")
+	} else if side == "right" {
+		e.Options("0.08", "00")
+	}
+
 	// How long to wait before playing the left sound, and right sound, respectively.
         // Add the effect to the end of the effects processing chain:
 	chain.Add(e, in.Signal(), in.Signal())
@@ -76,17 +105,28 @@ func main() {
 
 	// Create the remix effect, and add it
 	e = sox.CreateEffect(sox.FindEffect("remix"))
-	e.Options("1v.5", "2v.5") // Left channel volume = 1v[volume], right channel volume = 2v[volume], volume 0 to 1.
-        // Add the effect to the end of the effects processing chain:
+
+
+	// calc low intensity and make it into strings quick and dirty
+	lowIntensityVal:= intensityVal - 2
+	lowIntensityString:= strconv.FormatFloat(lowIntensityVal, 'f', -1, 64)
+
+	// check sides
+	if side == "left" {
+		e.Options(("1v" + intensity), ("2v" + lowIntensityString)) // Left channel volume = 1v[volume], right channel volume = 2v[volume], volume 0 to 1.
+	} else {
+		e.Options(("1v" + lowIntensityString), ("2v" + intensity)) // Left channel volume = 1v[volume], right channel volume = 2v[volume], volume 0 to 1.
+	}
+  // Add the effect to the end of the effects processing chain:
 	chain.Add(e, in.Signal(), in.Signal())
 	e.Release()
 	//*************************************************************************
 
 	// Create the `flanger' effect, and initialise it with default parameters:
-	e = sox.CreateEffect(sox.FindEffect("flanger"))
-	e.Options()
-	chain.Add(e, in.Signal(), in.Signal())
-	e.Release()
+	// e = sox.CreateEffect(sox.FindEffect("flanger"))
+	// e.Options()
+	// chain.Add(e, in.Signal(), in.Signal())
+	// e.Release()
 
 	// The last effect in the effect chain must be something that only consumes
 	// samples; in this case, we use the built-in handler that outputs data.
